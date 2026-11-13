@@ -11,7 +11,7 @@ variable "project" {
 variable "schedule_expression" {
   description = "EventBridge Scheduler expression, evaluated in schedule_timezone."
   type        = string
-  default     = "cron(0 8-20/2 * * ? *)"
+  default     = "cron(0 7-21/2 * * ? *)"
 }
 
 variable "schedule_timezone" {
