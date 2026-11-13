@@ -241,6 +241,7 @@ name = "ryanair-price-monitor"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "requests" },
     { name = "ryanair-py" },
 ]
 
@@ -250,7 +251,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "ryanair-py", specifier = ">=3.0.0" }]
+requires-dist = [
+    { name = "requests", specifier = ">=2.34.2" },
+    { name = "ryanair-py", specifier = ">=3.0.0" },
+]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.2.0" }]

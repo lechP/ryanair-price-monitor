@@ -7,7 +7,7 @@ Prices come from Ryanair's unofficial fare-finder API (`services-api.ryanair.com
 ## Status
 
 - [x] Local price check
-- [ ] Notifications via [ntfy.sh](https://ntfy.sh)
+- [x] Notifications via [ntfy.sh](https://ntfy.sh)
 - [ ] AWS Lambda + EventBridge Scheduler (every 2 hours, 08:00–20:00 Europe/Warsaw), deployed with Terraform
 
 ## Configuration
@@ -32,6 +32,20 @@ Out: WRO->AGP 2027-01-14 16:45 FR 2582 316.71 PLN
 Back: AGP->WRO 2027-01-21 21:05 FR 2581 211.12 PLN
 Total: 527.83 PLN
 ```
+
+## Notifications (ntfy)
+
+1. Pick a hard-to-guess topic name, e.g. `python3 -c "import secrets; print('ryanair-' + secrets.token_urlsafe(16))"`. Anyone who knows the topic can read and post to it, so keep it out of the repository.
+2. Install the ntfy app on the phone and subscribe to that topic on `ntfy.sh`.
+3. Send the current prices:
+
+```bash
+NTFY_TOPIC=<your-topic> uv run python -m ryanair_price_monitor.cli --notify
+```
+
+Each trip becomes one notification titled `WRO-AGP: 527.83 PLN`, with both legs in the body. Tapping it opens the Ryanair booking page for those dates. If a leg has no fare, the notification is sent with high priority.
+
+Optional variables: `NTFY_SERVER` (default `https://ntfy.sh`) and `NTFY_TOKEN` (bearer token for a protected topic or a self-hosted server).
 
 ## Tests
 
