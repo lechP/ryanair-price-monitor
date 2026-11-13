@@ -13,3 +13,4 @@ build/
 !*.tfvars.example
 
 .DS_Store
+.idea
