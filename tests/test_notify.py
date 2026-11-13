@@ -34,7 +34,11 @@ def test_send_posts_price_to_topic():
     assert url == "https://ntfy.sh/secret-topic"
     assert kwargs["headers"]["Title"] == "WRO-AGP: 527.83 PLN"
     assert kwargs["headers"]["Authorization"] == "Bearer tk"
-    assert "dateOut=2027-01-14" in kwargs["headers"]["Click"]
+    assert "Click" not in kwargs["headers"]
+    app_action, web_action = kwargs["headers"]["Actions"].split("; ")
+    assert app_action == f"view, Ryanair app, {notify.APP_URL}"
+    assert web_action.startswith("view, Website, https://www.ryanair.com/")
+    assert "dateOut=2027-01-14" in web_action
     assert b"Total: 527.83 PLN" in kwargs["data"]
     session.post.return_value.raise_for_status.assert_called_once()
 

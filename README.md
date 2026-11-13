@@ -43,7 +43,7 @@ Total: 527.83 PLN
 NTFY_TOPIC=<your-topic> uv run python -m ryanair_price_monitor.cli --notify
 ```
 
-Each trip becomes one notification titled `WRO-AGP: 527.83 PLN`, with both legs in the body. Tapping it opens the Ryanair booking page for those dates. If a leg has no fare, the notification is sent with high priority.
+Each trip becomes one notification titled `WRO-AGP: 527.83 PLN`, with both legs in the body. Expand the notification (long press) to see two buttons: **Ryanair app** opens the app's home screen, and **Website** opens the Ryanair search for those dates in the browser. The app has no documented deep link for a route search, so the dated search is web only. If a leg has no fare, the notification is sent with high priority.
 
 Optional variables: `NTFY_SERVER` (default `https://ntfy.sh`) and `NTFY_TOKEN` (bearer token for a protected topic or a self-hosted server).
 

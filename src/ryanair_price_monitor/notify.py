@@ -12,6 +12,9 @@ from ryanair_price_monitor.prices import TripPrice, format_price
 
 DEFAULT_SERVER = "https://ntfy.sh"
 TIMEOUT_SECONDS = 10
+# Only path on Ryanair's domains registered as an iOS universal link; it opens the app's home screen.
+# The app ignores route and date parameters, so the dated search is offered as a separate web button.
+APP_URL = "https://app.ryanair.com/store/ios"
 
 
 @dataclass(frozen=True)
@@ -60,7 +63,7 @@ def build_message(result: TripPrice) -> tuple[str, str, dict[str, str]]:
     headers = {
         "Tags": "airplane" if total is not None else "warning",
         "Priority": "default" if total is not None else "high",
-        "Click": booking_url(result),
+        "Actions": f"view, Ryanair app, {APP_URL}; view, Website, {booking_url(result)}",
     }
     return title, body, headers
 
