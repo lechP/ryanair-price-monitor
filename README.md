@@ -37,10 +37,16 @@ Total: 527.83 PLN
 
 1. Pick a hard-to-guess topic name, e.g. `python3 -c "import secrets; print('ryanair-' + secrets.token_urlsafe(16))"`. Anyone who knows the topic can read and post to it, so keep it out of the repository.
 2. Install the ntfy app on the phone and subscribe to that topic on `ntfy.sh`.
-3. Send the current prices:
+3. Put the topic in `.env` in the repository root (copy `.env.example` if `.env` does not exist; `.env` is gitignored):
+
+```
+NTFY_TOPIC=<your-topic>
+```
+
+4. Send the current prices with [scripts/send-test-notification.sh](scripts/send-test-notification.sh) (run it from the IDE or a terminal):
 
 ```bash
-NTFY_TOPIC=<your-topic> uv run python -m ryanair_price_monitor.cli --notify
+./scripts/send-test-notification.sh
 ```
 
 Each trip becomes one notification titled `WRO-AGP: 527.83 PLN`, with both legs in the body. Expand the notification (long press) to see two buttons: **Ryanair app** opens the app's home screen, and **Website** opens the Ryanair search for those dates in the browser. The app has no documented deep link for a route search, so the dated search is web only. If a leg has no fare, the notification is sent with high priority.
