@@ -53,3 +53,14 @@ def test_config_requires_topic(monkeypatch):
     monkeypatch.delenv("NTFY_TOPIC", raising=False)
     with pytest.raises(RuntimeError):
         notify.NtfyConfig.from_env()
+
+
+def test_send_error_is_high_priority():
+    session = MagicMock()
+
+    notify.send_error(notify.NtfyConfig(topic="errors"), "boom", session=session)
+
+    kwargs = session.post.call_args.kwargs
+    assert session.post.call_args.args[0] == "https://ntfy.sh/errors"
+    assert kwargs["headers"]["Priority"] == "high"
+    assert kwargs["data"] == b"boom"

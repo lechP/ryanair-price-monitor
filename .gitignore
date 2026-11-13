@@ -16,3 +16,4 @@ build/
 .idea
 # Local secrets
 .env
+infra/backend.hcl

@@ -70,7 +70,22 @@ def build_message(result: TripPrice) -> tuple[str, str, dict[str, str]]:
 
 def send(config: NtfyConfig, result: TripPrice, session: requests.Session | None = None) -> None:
     title, body, headers = build_message(result)
-    headers["Title"] = title
+    _post(config, title, body, headers, session)
+
+
+def send_error(config: NtfyConfig, message: str, session: requests.Session | None = None) -> None:
+    headers = {"Tags": "rotating_light", "Priority": "high"}
+    _post(config, "ryanair-price-monitor failed", message, headers, session)
+
+
+def _post(
+    config: NtfyConfig,
+    title: str,
+    body: str,
+    headers: dict[str, str],
+    session: requests.Session | None,
+) -> None:
+    headers = {**headers, "Title": title}
     if config.token:
         headers["Authorization"] = f"Bearer {config.token}"
     http = session or requests

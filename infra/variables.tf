@@ -1,0 +1,36 @@
+variable "region" {
+  type    = string
+  default = "eu-central-1"
+}
+
+variable "project" {
+  type    = string
+  default = "ryanair-price-monitor"
+}
+
+variable "schedule_expression" {
+  description = "EventBridge Scheduler expression, evaluated in schedule_timezone."
+  type        = string
+  default     = "cron(0 8-20/2 * * ? *)"
+}
+
+variable "schedule_timezone" {
+  type    = string
+  default = "Europe/Warsaw"
+}
+
+variable "lambda_package" {
+  description = "Path to the zip built by scripts/build-lambda.sh."
+  type        = string
+  default     = "../dist/lambda.zip"
+}
+
+variable "log_retention_days" {
+  type    = number
+  default = 14
+}
+
+variable "ntfy_server" {
+  type    = string
+  default = "https://ntfy.sh"
+}

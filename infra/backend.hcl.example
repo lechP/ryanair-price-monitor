@@ -1,0 +1,7 @@
+# Copy to backend.hcl (gitignored) or generate it with:
+#   terraform -chdir=infra/bootstrap output -raw backend_config > infra/backend.hcl
+bucket       = "ryanair-price-monitor-tfstate-<account-id>"
+key          = "ryanair-price-monitor/terraform.tfstate"
+region       = "eu-central-1"
+encrypt      = true
+use_lockfile = true

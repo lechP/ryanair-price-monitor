@@ -8,7 +8,8 @@ Prices come from Ryanair's unofficial fare-finder API (`services-api.ryanair.com
 
 - [x] Local price check
 - [x] Notifications via [ntfy.sh](https://ntfy.sh)
-- [ ] AWS Lambda + EventBridge Scheduler (every 2 hours, 08:00–20:00 Europe/Warsaw), deployed with Terraform
+- [x] AWS Lambda + EventBridge Scheduler (every 2 hours, 08:00–20:00 Europe/Warsaw), defined in Terraform
+- [ ] First deployment
 
 ## Configuration
 
@@ -52,6 +53,63 @@ NTFY_TOPIC=<your-topic>
 Each trip becomes one notification titled `WRO-AGP: 527.83 PLN`, with both legs in the body. Expand the notification (long press) to see two buttons: **Ryanair app** opens the app's home screen, and **Website** opens the Ryanair search for those dates in the browser. The app has no documented deep link for a route search, so the dated search is web only. If a leg has no fare, the notification is sent with high priority.
 
 Optional variables: `NTFY_SERVER` (default `https://ntfy.sh`) and `NTFY_TOKEN` (bearer token for a protected topic or a self-hosted server).
+
+## AWS deployment
+
+Infrastructure lives in [infra/](infra/) (Terraform, region `eu-central-1`):
+
+- Lambda `ryanair-price-monitor` (Python 3.12, arm64) running `ryanair_price_monitor.handler.lambda_handler`, with Lambda retries disabled.
+- EventBridge Scheduler `cron(0 8-20/2 * * ? *)` in `Europe/Warsaw`: 08:00, 10:00, …, 20:00, no retries.
+- CloudWatch log group with 14-day retention; each check logs one JSON line with the prices.
+- IAM roles for the Lambda (logs, read two SSM parameters) and the scheduler (invoke the Lambda).
+
+Prices go to the ntfy topic in SSM parameter `/ryanair-price-monitor/ntfy-topic`. Any failure goes to a separate topic in `/ryanair-price-monitor/ntfy-error-topic` with high priority. Both parameters are created by hand so the topic names never appear in Terraform state.
+
+All commands below assume the private AWS profile:
+
+```bash
+export AWS_CONFIG_FILE=~/.aws/private-config AWS_PROFILE=<profile>
+aws sts get-caller-identity
+```
+
+### One-time setup
+
+1. Create the state bucket (local state, kept in `infra/bootstrap/`):
+
+```bash
+terraform -chdir=infra/bootstrap init
+terraform -chdir=infra/bootstrap apply
+terraform -chdir=infra/bootstrap output -raw backend_config > infra/backend.hcl
+```
+
+2. Create both ntfy topic parameters (subscribe to both topics in the phone app):
+
+```bash
+aws ssm put-parameter --region eu-central-1 --type SecureString --name /ryanair-price-monitor/ntfy-topic --value '<price-topic>'
+aws ssm put-parameter --region eu-central-1 --type SecureString --name /ryanair-price-monitor/ntfy-error-topic --value '<error-topic>'
+```
+
+3. Initialise the main stack:
+
+```bash
+terraform -chdir=infra init -backend-config=backend.hcl
+```
+
+### Deploy
+
+```bash
+./scripts/build-lambda.sh
+terraform -chdir=infra apply
+```
+
+Changing [config/trips.json](config/trips.json) requires the same two commands.
+
+### Manual check
+
+```bash
+aws lambda invoke --region eu-central-1 --function-name ryanair-price-monitor /dev/stdout
+aws logs tail --region eu-central-1 /aws/lambda/ryanair-price-monitor --since 1h
+```
 
 ## Tests
 
