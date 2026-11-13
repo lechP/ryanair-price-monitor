@@ -1,0 +1,12 @@
+{
+  "currency": "PLN",
+  "trips": [
+    {
+      "name": "WRO-AGP January 2027",
+      "origin": "WRO",
+      "destination": "AGP",
+      "outbound_date": "2027-01-14",
+      "inbound_date": "2027-01-21"
+    }
+  ]
+}
