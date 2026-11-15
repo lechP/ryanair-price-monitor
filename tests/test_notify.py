@@ -64,3 +64,30 @@ def test_send_error_is_high_priority():
     assert session.post.call_args.args[0] == "https://ntfy.sh/errors"
     assert kwargs["headers"]["Priority"] == "high"
     assert kwargs["data"] == b"boom"
+
+
+def test_change_title_shows_signed_difference():
+    from decimal import Decimal
+
+    result = TripPrice(TRIP, _flight("WRO", "AGP", 304.28), _flight("AGP", "WRO", 211.12))
+    previous = notify.Previous(price=Decimal("527.83"), at="2026-11-15T07:00:00+00:00")
+
+    title, body, headers = notify.build_message(result, previous)
+
+    assert title == "WRO-AGP: 515.40 PLN (-12.43, -2.4%)"
+    assert headers["Tags"] == "chart_with_downwards_trend"
+    assert "Previously notified: 527.83 PLN at 2026-11-15T07:00:00+00:00" in body
+    title.encode("latin-1")  # HTTP header must stay latin-1
+
+
+def test_summary_is_low_priority():
+    from decimal import Decimal
+
+    result = TripPrice(TRIP, _flight("WRO", "AGP", 316.71), _flight("AGP", "WRO", 211.12))
+    stats = notify.DailyStats(Decimal("515.40"), Decimal("527.83"), 2)
+
+    title, body, headers = notify.build_summary(result, None, stats)
+
+    assert title == "Daily WRO-AGP: 527.83 PLN"
+    assert headers["Priority"] == "low"
+    assert "Last 24h: min 515.40 PLN, max 527.83 PLN, 2 price change(s)" in body

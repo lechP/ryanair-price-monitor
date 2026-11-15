@@ -32,6 +32,9 @@ resource "aws_lambda_function" "monitor" {
       NTFY_TOPIC_PARAMETER       = local.ntfy_topic_parameter
       NTFY_ERROR_TOPIC_PARAMETER = local.ntfy_error_topic_parameter
       NTFY_SERVER                = var.ntfy_server
+      TABLE_NAME                 = aws_dynamodb_table.prices.name
+      SCHEDULE_TIMEZONE          = var.schedule_timezone
+      DAILY_SUMMARY_HOUR         = tostring(var.daily_summary_hour)
     }
   }
 
@@ -79,8 +82,37 @@ resource "aws_iam_role_policy" "lambda" {
         Action   = ["ssm:GetParameters"]
         Resource = ["${local.parameter_arn_prefix}/ntfy-topic", "${local.parameter_arn_prefix}/ntfy-error-topic"]
       },
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query"]
+        Resource = aws_dynamodb_table.prices.arn
+      },
     ]
   })
+}
+
+# --- Price history and notification state ---------------------------------
+
+resource "aws_dynamodb_table" "prices" {
+  name                        = var.project
+  billing_mode                = "PAY_PER_REQUEST"
+  hash_key                    = "trip_id"
+  range_key                   = "sk"
+  deletion_protection_enabled = true
+
+  attribute {
+    name = "trip_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "sk"
+    type = "S"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
 }
 
 # --- Schedule ---------------------------------------------------------------

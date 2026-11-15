@@ -34,3 +34,9 @@ variable "ntfy_server" {
   type    = string
   default = "https://ntfy.sh"
 }
+
+variable "daily_summary_hour" {
+  description = "Local hour (schedule_timezone) whose scheduled run sends the daily summary; must match a run in schedule_expression."
+  type        = number
+  default     = 21
+}

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from decimal import Decimal
 from urllib.parse import urlencode
 
 import requests
@@ -53,23 +54,103 @@ def booking_url(result: TripPrice) -> str:
     return "https://www.ryanair.com/pl/pl/trip/flights/select?" + urlencode(params)
 
 
-def build_message(result: TripPrice) -> tuple[str, str, dict[str, str]]:
-    """Return (title, body, extra headers) for one trip."""
+@dataclass(frozen=True)
+class Previous:
+    """The price the user last saw in a notification."""
+
+    price: Decimal | None
+    at: str
+
+
+@dataclass(frozen=True)
+class DailyStats:
+    min_price: Decimal | None
+    max_price: Decimal | None
+    changes: int
+
+
+def _money(value: Decimal | float | None, currency: str | None) -> str:
+    return f"{value:.2f} {currency}" if value is not None else "no fare"
+
+
+def _change(current: Decimal | None, previous: Previous | None) -> str | None:
+    """Signed change such as "-12.43, -2.4%" or None when there is nothing to compare."""
+    if previous is None or previous.price is None or current is None:
+        return None
+    diff = current - previous.price
+    pct = diff / previous.price * 100 if previous.price else Decimal(0)
+    return f"{diff:+.2f}, {pct:+.1f}%"
+
+
+def _trend_tag(current: Decimal | None, previous: Previous | None) -> str:
+    if current is None:
+        return "warning"
+    if previous is None or previous.price is None or current == previous.price:
+        return "airplane"
+    return "chart_with_downwards_trend" if current < previous.price else "chart_with_upwards_trend"
+
+
+def _actions(result: TripPrice) -> str:
+    return f"view, Ryanair app, {APP_URL}; view, Website, {booking_url(result)}"
+
+
+def build_message(result: TripPrice, previous: Previous | None = None) -> tuple[str, str, dict[str, str]]:
+    """Return (title, body, extra headers) for a price notification."""
     trip = result.trip
-    total = result.total
-    price = f"{total:.2f} {result.currency}" if total is not None else "no fare"
-    title = f"{trip.origin}-{trip.destination}: {price}"
+    current = result.total_decimal
+    title = f"{trip.origin}-{trip.destination}: {_money(current, result.currency)}"
+    change = _change(current, previous)
+    if change:
+        title += f" ({change})"
     body = format_price(result)
+    if previous is not None:
+        body += f"\nPreviously notified: {_money(previous.price, result.currency)} at {previous.at}"
     headers = {
-        "Tags": "airplane" if total is not None else "warning",
-        "Priority": "default" if total is not None else "high",
-        "Actions": f"view, Ryanair app, {APP_URL}; view, Website, {booking_url(result)}",
+        "Tags": _trend_tag(current, previous),
+        "Priority": "default" if current is not None else "high",
+        "Actions": _actions(result),
     }
     return title, body, headers
 
 
-def send(config: NtfyConfig, result: TripPrice, session: requests.Session | None = None) -> None:
-    title, body, headers = build_message(result)
+def build_summary(
+    result: TripPrice, previous: Previous | None, stats: DailyStats
+) -> tuple[str, str, dict[str, str]]:
+    """Return (title, body, extra headers) for the low-priority daily summary."""
+    trip = result.trip
+    current = result.total_decimal
+    currency = result.currency
+    title = f"Daily {trip.origin}-{trip.destination}: {_money(current, currency)}"
+    lines = [format_price(result)]
+    change = _change(current, previous)
+    if change:
+        lines.append(f"Since last notification ({previous.at}): {change}")
+    lines.append(
+        f"Last 24h: min {_money(stats.min_price, currency)}, max {_money(stats.max_price, currency)}, "
+        f"{stats.changes} price change(s)"
+    )
+    headers = {"Tags": "calendar", "Priority": "low", "Actions": _actions(result)}
+    return title, "\n".join(lines), headers
+
+
+def send(
+    config: NtfyConfig,
+    result: TripPrice,
+    previous: Previous | None = None,
+    session: requests.Session | None = None,
+) -> None:
+    title, body, headers = build_message(result, previous)
+    _post(config, title, body, headers, session)
+
+
+def send_summary(
+    config: NtfyConfig,
+    result: TripPrice,
+    previous: Previous | None,
+    stats: DailyStats,
+    session: requests.Session | None = None,
+) -> None:
+    title, body, headers = build_summary(result, previous, stats)
     _post(config, title, body, headers, session)
 
 

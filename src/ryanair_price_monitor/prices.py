@@ -5,10 +5,15 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 
 from ryanair import Ryanair
 from ryanair.types import Flight
+
+
+DEFAULT_MIN_CHANGE_ABS = Decimal("10")
+DEFAULT_MIN_CHANGE_PCT = Decimal("2")
 
 
 @dataclass(frozen=True)
@@ -18,15 +23,26 @@ class TripConfig:
     destination: str
     outbound_date: date
     inbound_date: date
+    # A notification is sent when the total moved by at least one of these since the last notification.
+    min_change_abs: Decimal = DEFAULT_MIN_CHANGE_ABS
+    min_change_pct: Decimal = DEFAULT_MIN_CHANGE_PCT
+
+    @property
+    def trip_id(self) -> str:
+        """Stable key built from route and dates, so renaming a trip keeps its history."""
+        return f"{self.origin}-{self.destination}-{self.outbound_date}-{self.inbound_date}"
 
     @classmethod
-    def from_dict(cls, data: dict) -> TripConfig:
+    def from_dict(cls, data: dict, defaults: dict | None = None) -> TripConfig:
+        merged = {**(defaults or {}), **data}
         return cls(
-            name=data["name"],
-            origin=data["origin"],
-            destination=data["destination"],
-            outbound_date=date.fromisoformat(data["outbound_date"]),
-            inbound_date=date.fromisoformat(data["inbound_date"]),
+            name=merged["name"],
+            origin=merged["origin"],
+            destination=merged["destination"],
+            outbound_date=date.fromisoformat(merged["outbound_date"]),
+            inbound_date=date.fromisoformat(merged["inbound_date"]),
+            min_change_abs=Decimal(str(merged.get("notify_min_change_abs", DEFAULT_MIN_CHANGE_ABS))),
+            min_change_pct=Decimal(str(merged.get("notify_min_change_pct", DEFAULT_MIN_CHANGE_PCT))),
         )
 
 
@@ -43,6 +59,11 @@ class TripPrice:
         return round(self.outbound.price + self.inbound.price, 2)
 
     @property
+    def total_decimal(self) -> Decimal | None:
+        total = self.total
+        return Decimal(str(total)) if total is not None else None
+
+    @property
     def currency(self) -> str | None:
         flight = self.outbound or self.inbound
         return flight.currency if flight else None
@@ -50,7 +71,8 @@ class TripPrice:
 
 def load_config(path: Path) -> tuple[str, list[TripConfig]]:
     data = json.loads(path.read_text())
-    return data["currency"], [TripConfig.from_dict(t) for t in data["trips"]]
+    defaults = {k: v for k, v in data.items() if k.startswith("notify_")}
+    return data["currency"], [TripConfig.from_dict(t, defaults) for t in data["trips"]]
 
 
 def _cheapest_one_way(client: Ryanair, origin: str, destination: str, day: date) -> Flight | None:

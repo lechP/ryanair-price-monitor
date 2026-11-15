@@ -9,3 +9,7 @@ output "schedule" {
 output "ntfy_parameters" {
   value = [local.ntfy_topic_parameter, local.ntfy_error_topic_parameter]
 }
+
+output "table_name" {
+  value = aws_dynamodb_table.prices.name
+}

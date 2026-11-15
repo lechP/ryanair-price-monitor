@@ -9,11 +9,31 @@ Prices come from Ryanair's unofficial fare-finder API (`services-api.ryanair.com
 - [x] Local price check
 - [x] Notifications via [ntfy.sh](https://ntfy.sh)
 - [x] AWS Lambda + EventBridge Scheduler (every 2 hours, 08:00–20:00 Europe/Warsaw), defined in Terraform
-- [ ] First deployment
+- [x] First deployment
+- [x] Price history and threshold-based notifications with a daily summary
 
 ## Configuration
 
 Trips are defined in [config/trips.json](config/trips.json): currency plus a list of trips with `origin`, `destination`, `outbound_date` and `inbound_date` (IATA codes, ISO dates).
+
+`notify_min_change_abs` (default 10) and `notify_min_change_pct` (default 2) set the notification thresholds. They can be set at the top level or overridden per trip.
+
+## Notification rules (Lambda)
+
+Each scheduled check:
+
+1. Fetches the current total for each trip.
+2. Stores a history record in DynamoDB whenever the total differs from the previous check.
+3. Sends a notification when the total moved by at least `notify_min_change_abs` **or** at least `notify_min_change_pct` percent compared with the **last notified** price, in either direction. Comparing with the last notification (not the last check) means slow drifts add up and eventually notify.
+4. Always notifies on the first check of a trip and when a fare disappears or comes back.
+
+The run at `daily_summary_hour` (default 21:00 Europe/Warsaw) sends a low-priority daily summary instead: current price, change since the last notification, and min/max over the last 24 hours. It confirms the monitor is alive on quiet days, and later thresholds are measured from the summarised price. Force one with:
+
+```bash
+aws lambda invoke --region eu-central-1 --function-name ryanair-price-monitor --cli-binary-format raw-in-base64-out --payload '{"daily_summary": true}' /dev/stdout
+```
+
+The local CLI is stateless: it always prints the price and, with `--notify`, always sends it.
 
 ## Local usage
 
@@ -60,8 +80,9 @@ Infrastructure lives in [infra/](infra/) (Terraform, region `eu-central-1`):
 
 - Lambda `ryanair-price-monitor` (Python 3.12, arm64) running `ryanair_price_monitor.handler.lambda_handler`, with Lambda retries disabled.
 - EventBridge Scheduler `cron(0 8-20/2 * * ? *)` in `Europe/Warsaw`: 08:00, 10:00, …, 20:00, no retries.
-- CloudWatch log group with 14-day retention; each check logs one JSON line with the prices.
-- IAM roles for the Lambda (logs, read two SSM parameters) and the scheduler (invoke the Lambda).
+- DynamoDB table `ryanair-price-monitor` (on-demand, point-in-time recovery, deletion protection) with price history and per-trip notification state.
+- CloudWatch log group with 14-day retention; each check logs one JSON line with the price and the action taken (`notified`, `silent`, `summary`).
+- IAM roles for the Lambda (logs, read two SSM parameters, read/write the table) and the scheduler (invoke the Lambda).
 
 Prices go to the ntfy topic in SSM parameter `/ryanair-price-monitor/ntfy-topic`. Any failure goes to a separate topic in `/ryanair-price-monitor/ntfy-error-topic` with high priority. Both parameters are created by hand so the topic names never appear in Terraform state.
 

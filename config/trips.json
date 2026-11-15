@@ -1,5 +1,7 @@
 {
   "currency": "PLN",
+  "notify_min_change_abs": 10,
+  "notify_min_change_pct": 2,
   "trips": [
     {
       "name": "WRO-AGP January 2027",
